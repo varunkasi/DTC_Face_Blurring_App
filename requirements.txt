@@ -3,5 +3,7 @@ Pillow
 ttkthemes
 customtkinter
 tkvideoplayer
-opencv-python==4.5.5.64
-opencv-python-headless==4.5.5.64
+huggingface_hub
+ultralytics
+supervision
+opencv-fixer==0.2.5

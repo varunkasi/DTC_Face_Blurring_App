@@ -1,4 +1,3 @@
-import cv2
 import tkinter as tk
 from tkinter import filedialog
 from PIL import Image, ImageTk
@@ -7,6 +6,11 @@ import numpy as np
 import torch
 from tkinter import messagebox
 import os
+from opencv_fixer import AutoFix; AutoFix()
+import cv2
+from huggingface_hub import hf_hub_download
+from ultralytics import YOLO
+from supervision import Detections
 
 
 def upload_video():
@@ -62,13 +66,24 @@ def process_frames(frames):
     """
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"CUDA available: {device == 'cuda'}")  # Print CUDA availability
-    mtcnn = MTCNN(keep_all=True, device=device)
+
+    # download model
+    model_path = hf_hub_download(repo_id="arnabdhar/YOLOv8-Face-Detection", filename="model.pt")
+
+    # load model
+    model = YOLO(model_path)
+
+    # mtcnn = MTCNN(keep_all=True, device=device)
     
     face_locations = []
     
     for frame_count, frame in enumerate(frames):
-        # Detect faces using MTCNN
-        boxes, _ = mtcnn.detect(frame)
+        # # Detect faces using MTCNN
+        # boxes, _ = mtcnn.detect(frame)
+
+        results = model(frame)[0]
+        detections = Detections.from_ultralytics(results)
+        boxes = detections.xyxy
         if boxes is not None:
             face_locations.append(boxes)
         else:
