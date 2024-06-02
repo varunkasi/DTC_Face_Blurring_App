@@ -1,14 +1,11 @@
 import tkinter as tk
 from tkinter import filedialog
 from PIL import Image, ImageTk
-from facenet_pytorch import MTCNN
 import numpy as np
 import torch
 from tkinter import messagebox
 import os
-from opencv_fixer import AutoFix; AutoFix()
 import cv2
-from huggingface_hub import hf_hub_download
 from ultralytics import YOLO
 from supervision import Detections
 
@@ -49,7 +46,6 @@ def upload_frames():
     """
     status_bar.config(text="Uploading frames... Make sure to double click!")
     dir_path = filedialog.askdirectory(title="Please navigate to and double-click the directory you want to select, and then click 'OK'")
-    print(f"Selected directory: {dir_path}")  # Print the selected directory
     files = sorted([os.path.join(dir_path, file) for file in os.listdir(dir_path) if file.endswith(('.jpg', '.png', '.jpeg'))]) #check file extn here
     frames = [np.array(Image.open(files[i])) for i in range(len(files))]
     process_frames(frames)
@@ -68,10 +64,10 @@ def process_frames(frames):
     print(f"CUDA available: {device == 'cuda'}")  # Print CUDA availability
 
     # download model
-    model_path = hf_hub_download(repo_id="arnabdhar/YOLOv8-Face-Detection", filename="model.pt")
+    # model_path = hf_hub_download(repo_id="arnabdhar/YOLOv8-Face-Detection", filename="model.pt")
 
     # load model
-    model = YOLO(model_path)
+    model = YOLO('/app/model/model.pt')
 
     # mtcnn = MTCNN(keep_all=True, device=device)
     

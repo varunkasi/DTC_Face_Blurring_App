@@ -1,9 +1,1 @@
-facenet-pytorch
-Pillow
-ttkthemes
-customtkinter
-tkvideoplayer
-huggingface_hub
-ultralytics
 supervision
-opencv-fixer==0.2.5
