@@ -81,7 +81,7 @@ def process_frames(frames):
         detections = Detections.from_ultralytics(results)
         boxes = detections.xyxy
         if boxes is not None:
-            face_locations.append(boxes)
+            face_locations.append(list(boxes))
         else:
             face_locations.append([])
         
@@ -102,6 +102,15 @@ def select_faces_to_blur(frames, face_locations, scale_factor=0.5):
     Returns:
         None
     """
+    
+    # Ensure that face_locations is a list
+    if not isinstance(face_locations, list):
+        face_locations = list(face_locations)
+
+    # Add a flag to indicate whether the user is in draw mode
+    draw_mode = False
+    # Add a variable to store the starting coordinates of the bounding box
+    start_coords = None
 
     selected_faces = []
 
@@ -124,52 +133,123 @@ def select_faces_to_blur(frames, face_locations, scale_factor=0.5):
 
     status_bar_fs = tk.Label(window, text="Ready", bd=1, relief=tk.SUNKEN, anchor=tk.W)
     status_bar_fs.pack(side=tk.BOTTOM, fill=tk.X)
-    status_bar_fs.config(text="GREEN boxes ➡️ selected for blurring | RED boxes ➡️ unselected faces. Click on a box to toggle its status.")
+    status_bar_fs.config(text="GREEN boxes -> selected for blurring | RED boxes -> unselected faces. Click on a box to toggle its status.")
 
     def toggle_face_status(event):
+        nonlocal draw_mode, start_coords
+
         # Get the frame and face statuses for this image
         frame, faces, statuses, original_faces = image_label.image_info
 
-        # Check each face to see if it was clicked
-        for i, box in enumerate(faces):
-            x1, y1, x2, y2 = box.astype(int)
-            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
-                # Toggle the status of this face
-                statuses[i] = not statuses[i]
+        if draw_mode:
+        # If the user is in draw mode, start drawing a bounding box
+            start_coords = (event.x, event.y)
+        else:
+            # Check each face to see if it was clicked
+            for i, box in enumerate(faces):
+                x1, y1, x2, y2 = box.astype(int)
+                if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+                    # Toggle the status of this face
+                    statuses[i] = not statuses[i]
 
-                # Redraw the bounding box for this face
-                color = (0, 255, 0) if statuses[i] else (255, 0, 0)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                    # Redraw the bounding box for this face
+                    color = (0, 255, 0) if statuses[i] else (255, 0, 0)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
-                # Update the image in the label
-                image = Image.fromarray(frame)
-                photo = ImageTk.PhotoImage(image)
-                image_label.config(image=photo)
-                image_label.image = photo
+                    # Update the image in the label
+                    image = Image.fromarray(frame)
+                    photo = ImageTk.PhotoImage(image)
+                    image_label.config(image=photo)
+                    image_label.image = photo
 
     # Bind the mouse click event to the toggle_face_status function
     image_label.bind('<Button-1>', toggle_face_status)
 
+    def draw_box(event):
+        nonlocal draw_mode, start_coords
+        if draw_mode and start_coords is not None:
+            frame, faces, statuses, original_faces = image_label.image_info
+            # Create a copy of the frame
+            frame_copy = frame.copy()
+            # Draw the box on the copy of the frame
+            x1, y1 = start_coords
+            x2, y2 = event.x, event.y
+            cv2.rectangle(frame_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            # Update the image in the label
+            image = Image.fromarray(frame_copy)
+            photo = ImageTk.PhotoImage(image)
+            image_label.config(image=photo)
+            image_label.image = photo
+
+    def end_draw(event):
+        nonlocal draw_mode, start_coords
+        if draw_mode and start_coords is not None:
+            frame, faces, statuses, original_faces = image_label.image_info
+            # Draw the final box on the original frame
+            x1, y1 = start_coords
+            x2, y2 = event.x, event.y
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            # Add the new box to the list of boxes for this frame
+            new_box = list(np.array([x1, y1, x2, y2]) / scale_factor)
+            face_locations[current_frame].append(new_box)
+            # Add the new box to the faces list
+            faces.append(np.array([x1, y1, x2, y2]))
+            # Add a new status for this box
+            face_statuses[current_frame].append(True)
+            # Reset the start coordinates
+            start_coords = None
+            # Update the frame
+            update_frame(current_frame)
+            # End the draw mode
+            toggle_draw_mode()
+
+    def toggle_draw_mode():
+        nonlocal draw_mode
+        # Toggle the draw mode
+        draw_mode = not draw_mode
+        # Update the button text based on the draw mode
+        draw_button.config(text="End Draw Mode" if draw_mode else "Start Draw Mode")
+
+    # Add a button to toggle the draw mode
+    draw_button = tk.Button(window, text="Start Draw Mode", command=toggle_draw_mode)
+    draw_button.pack()
+
+    # Bind the mouse events to the appropriate functions
+    image_label.bind('<B1-Motion>', draw_box)
+    image_label.bind('<ButtonRelease-1>', end_draw)
+
     def next_frame(event=None):
         nonlocal current_frame
-        current_frame += 1
-        if current_frame < len(frames_copy):
-            update_frame(current_frame)
+        # Check if the draw mode is active
+        if draw_mode:
+            # If it is, prompt the user to end the draw mode before proceeding
+            messagebox.showinfo("End Draw Mode", "Please end the draw mode before proceeding to the next frame.")
         else:
-            # If it's the last frame, show a message box
-            msg = "You have reached the end of the frames. To go back to the selection process, press Yes. To conclude selection, press No?"
-            response = messagebox.askyesno("End of frames", msg)
-            if response:  # If user wants to go back to the selection process
-                current_frame -= 1
+            # If it's not, proceed to the next frame
+            current_frame += 1
+            if current_frame < len(frames_copy):
                 update_frame(current_frame)
-            else:  # If user wants to conclude selection
-                window.destroy()  # Close the window
+            else:
+                # If it's the last frame, show a message box
+                msg = "You have reached the end of the frames. To go back to the selection process, press Yes. To conclude selection, press No?"
+                response = messagebox.askyesno("End of frames", msg)
+                if response:  # If user wants to go back to the selection process
+                    current_frame -= 1
+                    update_frame(current_frame)
+                else:  # If user wants to conclude selection
+                    window.destroy()  # Close the window
 
     def prev_frame(event=None):
         nonlocal current_frame
-        current_frame -= 1
-        if current_frame >= 0:
-            update_frame(current_frame)
+        # Check if the draw mode is active
+        if draw_mode:
+            # If it is, prompt the user to end the draw mode before proceeding
+            messagebox.showinfo("End Draw Mode", "Please end the draw mode before proceeding to the previous frame.")
+        else:
+            # If it's not, proceed to the previous frame
+            current_frame -= 1
+            if current_frame >= 0:
+                update_frame(current_frame)
 
     def update_frame(i):
         frame, faces, statuses = frames_copy[i], face_locations_scaled[i], face_statuses[i]
@@ -210,7 +290,7 @@ def select_faces_to_blur(frames, face_locations, scale_factor=0.5):
     for i, (faces, statuses, original_faces) in enumerate(zip(face_locations_scaled, face_statuses, face_locations)):
         for j, (box, status, original_box) in enumerate(zip(faces, statuses, original_faces)):
             if status:
-                x1, y1, x2, y2 = original_box.astype(int)
+                x1, y1, x2, y2 = np.array(original_box).astype(int)
                 selected_faces.append((i, x1, y1, x2, y2))
 
     blur_selected_faces(frames, selected_faces)
