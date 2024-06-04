@@ -8,7 +8,7 @@ import os
 import cv2
 from ultralytics import YOLO
 from supervision import Detections
-
+from tkinter import simpledialog
 
 def upload_video():
     """
@@ -48,20 +48,22 @@ def upload_frames():
     dir_path = filedialog.askdirectory(title="Please navigate to and double-click the directory you want to select, and then click 'OK'")
     files = sorted([os.path.join(dir_path, file) for file in os.listdir(dir_path) if file.endswith(('.jpg', '.png', '.jpeg'))]) #check file extn here
     frames = [np.array(Image.open(files[i])) for i in range(len(files))]
-    process_frames(frames)
+    process_frames(frames, input_files=sorted([file for file in os.listdir(dir_path) if file.endswith(('.jpg', '.png', '.jpeg'))])) #check file extn here)
 
-def process_frames(frames):
+def process_frames(frames, input_files=None):
     """
     Process each frame in the given list of frames and detect faces using MTCNN.
 
     Args:
         frames (list): A list of frames to be processed.
+        input_files (list): A list of input file paths.
 
     Returns:
         None
     """
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"CUDA available: {device == 'cuda'}")  # Print CUDA availability
+    # print(f"CUDA available: {device == 'cuda'}")  # Print CUDA availability
 
     # download model
     # model_path = hf_hub_download(repo_id="arnabdhar/YOLOv8-Face-Detection", filename="model.pt")
@@ -72,8 +74,8 @@ def process_frames(frames):
     # mtcnn = MTCNN(keep_all=True, device=device)
     
     face_locations = []
-    
-    for frame_count, frame in enumerate(frames):
+
+    for frame_count, (frame, input_file) in enumerate(zip(frames, input_files)):
         # # Detect faces using MTCNN
         # boxes, _ = mtcnn.detect(frame)
 
@@ -84,13 +86,13 @@ def process_frames(frames):
             face_locations.append(list(boxes))
         else:
             face_locations.append([])
-        
+
         status_bar.config(text=f"Processed {frame_count + 1} out of {len(frames)} frames")
         root.update_idletasks()
     
-    select_faces_to_blur(frames, face_locations)
+    select_faces_to_blur(frames, face_locations, input_files)
 
-def select_faces_to_blur(frames, face_locations, scale_factor=0.5):
+def select_faces_to_blur(frames, face_locations, input_files=None, scale_factor=0.5):
     """
     Selects faces to blur in a series of frames.
 
@@ -293,9 +295,9 @@ def select_faces_to_blur(frames, face_locations, scale_factor=0.5):
                 x1, y1, x2, y2 = np.array(original_box).astype(int)
                 selected_faces.append((i, x1, y1, x2, y2))
 
-    blur_selected_faces(frames, selected_faces)
+    blur_selected_faces(frames, selected_faces, input_files)
 
-def blur_selected_faces(frames, selected_faces):
+def blur_selected_faces(frames, selected_faces, input_files=None):
     """
     Blurs the selected faces in the original video frames.
 
@@ -321,9 +323,9 @@ def blur_selected_faces(frames, selected_faces):
         
         blurred_frames.append(frame)
     
-    display_video(blurred_frames)  # Call display_video function here
+    display_video(blurred_frames, input_files)  # Call display_video function here
 
-def display_video(frames):
+def display_video(frames, input_files=None):
     """
     Display a video by showing each frame in a separate window.
 
@@ -355,10 +357,10 @@ def display_video(frames):
     
     update_frame(0)
     
-    save_button = tk.Button(video_window, text="Save Video", command=lambda: save_video(frames))
+    save_button = tk.Button(video_window, text="Save Video", command=lambda: save_video(frames, input_files))
     save_button.pack()
 
-def save_video(frames):
+def save_video(frames, input_files=None):
     """
     Saves a list of frames as a video file.
 
@@ -368,16 +370,27 @@ def save_video(frames):
     Returns:
         None
     """
-    file_path = filedialog.asksaveasfilename(defaultextension=".mp4", filetypes=[("Video Files", "*.mp4")])
-    if file_path:
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(file_path, fourcc, 30.0, (frames[0].shape[1], frames[0].shape[0]))
-        
-        for frame in frames:
-            out.write(frame)
-        
-        out.release()
-        print("Video saved successfully!")
+    # After processing all frames
+    if input_files is not None:
+        # Prompt the user to select a directory to save the frames to
+        dir_path = filedialog.askdirectory(title="Please select a directory to save the frames to")
+        # Iterate over the frames and input_files simultaneously
+        for frame, file_name in zip(frames, input_files):
+            print(os.path.join(dir_path, "blurred_", file_name))
+            # Save the frame to the selected directory with the file name from input_files
+            cv2.imwrite(os.path.join(dir_path, "blurred_" + file_name), frame)
+    else:
+        # Save the frames as a video
+        file_path = filedialog.asksaveasfilename(defaultextension=".mp4", filetypes=[("Video Files", "*.mp4")])
+        if file_path:
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(file_path, fourcc, 30.0, (frames[0].shape[1], frames[0].shape[0]))
+            
+            for frame in frames:
+                out.write(frame)
+            
+            out.release()
+            print("Video saved successfully!")
 
 root = tk.Tk()
 root.title("Face Blur App")

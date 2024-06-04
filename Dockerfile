@@ -1,4 +1,4 @@
-# Use the NGC PyTorch image as a base image
+# Use the Ultralytics image as a base image
 FROM ultralytics/ultralytics:latest
 
 # Set environment variables

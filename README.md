@@ -22,7 +22,13 @@ docker build --no-cache -t dtcfaceblurapp:v2 .
 
 3. Run the Docker container:
 
-docker run -it --rm --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 -v <Local Code Directory>:/app -v <Local Video Directory>:/app/videos --name video_face_blurring_tool_ultralytics  dtcfaceblurapp:v2
+In a devcontainer inside VSCode - 
+
+docker run -it --rm --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 -v /Local/Code/Directory/:/app/ -v /Local/Video/Directory/:/app/videos --name video_face_blurring_tool_ultralytics  dtcfaceblurapp:v2
+
+In a regular terminal - 
+
+docker run -it --rm --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 -v /Local/Code/Directory/:/app/ -v /Local/Video/Directory/:/app/videos -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix --name video_face_blurring_tool_ultralytics  dtcfaceblurapp:v2 python3 /app/src/app.py
 
 
 ### Usage
