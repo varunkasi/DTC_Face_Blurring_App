@@ -75,10 +75,7 @@ def process_frames(frames, input_files=None):
     
     face_locations = []
 
-    for frame_count, (frame, input_file) in enumerate(zip(frames, input_files)):
-        # # Detect faces using MTCNN
-        # boxes, _ = mtcnn.detect(frame)
-
+    for frame_count, frame in enumerate(frames):
         results = model(frame)[0]
         detections = Detections.from_ultralytics(results)
         boxes = detections.xyxy
